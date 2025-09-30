@@ -124,7 +124,247 @@
         <div class="sub">公式：回饋金額 = ⌊ 金額 × 回饋率 ⌋；門檻(至少 N 元) = ⌈ N / 回饋率 ⌉</div>
       </div>
     </header>
-    <p>（此處省略，完整內容與先前提供一致）</p>
+
+    <div class="grid">
+      <!-- 單筆計算 -->
+      <section class="card span-6">
+        <h2 class="section-title">單筆回饋</h2>
+        <div class="row">
+          <div>
+            <label for="amount">單筆金額（元）</label>
+            <input id="amount" type="number" inputmode="numeric" min="0" step="1" value="31" />
+          </div>
+          <div>
+            <label for="percent">回饋率（%）</label>
+            <input id="percent" type="number" inputmode="decimal" min="0" step="0.1" value="3.3" />
+          </div>
+        </div>
+        <div class="row" style="margin-top:12px">
+          <button id="calcBtn" class="btn">計算</button>
+          <button id="reset1" class="btn-ghost">重置</button>
+        </div>
+        <div class="stat" style="margin-top:12px">
+          <div>
+            <div class="muted">回饋金額（元）</div>
+            <div id="cashbackVal" class="val">—</div>
+          </div>
+          <div class="muted">採「單筆 × 回饋率 → 無條件捨去」</div>
+        </div>
+      </section>
+
+      <!-- 門檻計算 -->
+      <section class="card span-6">
+        <h2 class="section-title">最低門檻（至少 N 元回饋）</h2>
+        <div class="row">
+          <div>
+            <label for="percent2">回饋率（%）</label>
+            <input id="percent2" type="number" inputmode="decimal" min="0.0001" step="0.1" value="3.8" />
+          </div>
+          <div>
+            <label for="minReward">至少回饋（元）</label>
+            <input id="minReward" type="number" inputmode="numeric" min="1" step="1" value="1" />
+          </div>
+        </div>
+        <div class="row" style="margin-top:12px">
+          <button id="thresholdBtn" class="btn">計算門檻</button>
+          <button id="reset2" class="btn-ghost">重置</button>
+        </div>
+        <div class="stat" style="margin-top:12px">
+          <div>
+            <div class="muted">最低需刷（元）</div>
+            <div id="thresholdVal" class="val">—</div>
+          </div>
+          <div class="muted">門檻 = ⌈ N / (回饋率/100) ⌉</div>
+        </div>
+        <p class="note">
+          範例：3.8% 要拿 1 元 → ⌈1 / 0.038⌉ = 27；3.3% → 31；2% → 50。
+        </p>
+      </section>
+
+      <!-- 速查表 -->
+      <section class="card span-12">
+        <h2 class="section-title">速查表（區間產生）</h2>
+        <div class="row row-4">
+          <div>
+            <label for="rangeStart">起始（元，含）</label>
+            <input id="rangeStart" type="number" inputmode="numeric" min="0" step="1" value="10" />
+          </div>
+          <div>
+            <label for="rangeEnd">結束（元，含）</label>
+            <input id="rangeEnd" type="number" inputmode="numeric" min="0" step="1" value="200" />
+          </div>
+          <div>
+            <label for="rangeStep">步進（元）</label>
+            <input id="rangeStep" type="number" inputmode="numeric" min="1" step="1" value="10" />
+          </div>
+          <div>
+            <label for="percents">回饋率列表（以空白分隔，例如：<span class="kbd">3.8 3.3 2</span>）</label>
+            <input id="percents" type="text" value="3.8 3.3 2" />
+          </div>
+        </div>
+        <div class="row" style="margin-top:12px">
+          <button id="tableBtn" class="btn">產生速查表</button>
+          <button id="csvBtn" class="btn-ghost">匯出 CSV</button>
+        </div>
+        <div id="tableWrap" class="table-wrap" style="margin-top:12px; display:none;">
+          <table id="resultTable" aria-live="polite"></table>
+        </div>
+        <p class="note">提示：可把常用的回饋率填成 <span class="kbd">3.8 3.3 2</span>、或任何你有的活動檔期。</p>
+      </section>
+    </div>
+
+    <footer>
+      <p>計算規則：<strong>單筆</strong>金額 × 回饋率 → <strong>無條件捨去</strong>到整數元；門檻採用數學上的天花板函數（<code>ceil</code>）。</p>
+      <p>Made for GitHub Pages · 無外部依賴，可離線使用（瀏覽器快取）。</p>
+    </footer>
   </div>
+
+  <script>
+    // --- Core math ---
+    const floor = Math.floor;
+    const ceil = Math.ceil;
+
+    function cashback(amount, percent) {
+      if (amount < 0 || percent < 0) throw new Error("amount/percent must be non-negative");
+      return floor(amount * (percent / 100));
+    }
+    function thresholdForMinReward(percent, minReward = 1) {
+      if (percent <= 0 || minReward <= 0) throw new Error("percent/minReward must be positive");
+      const rate = percent / 100;
+      return ceil(minReward / rate);
+    }
+
+    // Utility
+    const $$ = (sel) => document.querySelector(sel);
+    function parsePercents(str) {
+      return str
+        .split(/[\s,]+/)
+        .map(s => s.trim())
+        .filter(Boolean)
+        .map(Number)
+        .filter(v => !Number.isNaN(v) && v >= 0);
+    }
+    function toastOK(btn) {
+      const t = btn.textContent;
+      btn.textContent = "✓ 完成";
+      btn.disabled = true;
+      setTimeout(() => { btn.textContent = t; btn.disabled = false; }, 900);
+    }
+
+    // 單筆
+    $$("#calcBtn").addEventListener("click", () => {
+      const amt = Number($$("#amount").value);
+      const p = Number($$("#percent").value);
+      if (Number.isNaN(amt) || Number.isNaN(p) || amt < 0 || p < 0) {
+        alert("請輸入有效的金額與回饋率。");
+        return;
+      }
+      $$("#cashbackVal").textContent = cashback(amt, p);
+      toastOK($$("#calcBtn"));
+    });
+    $$("#reset1").addEventListener("click", () => {
+      $$("#amount").value = 31;
+      $$("#percent").value = 3.3;
+      $$("#cashbackVal").textContent = "—";
+    });
+
+    // 門檻
+    $$("#thresholdBtn").addEventListener("click", () => {
+      const p = Number($$("#percent2").value);
+      const n = Number($$("#minReward").value);
+      if (Number.isNaN(p) || Number.isNaN(n) || p <= 0 || n <= 0) {
+        alert("請輸入有效的回饋率與至少回饋金額（> 0）。");
+        return;
+      }
+      $$("#thresholdVal").textContent = thresholdForMinReward(p, n);
+      toastOK($$("#thresholdBtn"));
+    });
+    $$("#reset2").addEventListener("click", () => {
+      $$("#percent2").value = 3.8;
+      $$("#minReward").value = 1;
+      $$("#thresholdVal").textContent = "—";
+    });
+
+    // 速查表
+    let latestTableData = null;
+
+    function buildTable(start, end, step, percents) {
+      const headers = ["金額(元)", ...percents.map(p => `${+p}%`)];
+      const rows = [];
+      for (let amt = start; amt <= end; amt += step) {
+        rows.push([amt, ...percents.map(p => cashback(amt, p))]);
+      }
+      latestTableData = { headers, rows }; // for CSV export
+
+      const table = $$("#resultTable");
+      table.innerHTML = "";
+      const thead = document.createElement("thead");
+      const trh = document.createElement("tr");
+      headers.forEach(h => {
+        const th = document.createElement("th");
+        th.textContent = h;
+        trh.appendChild(th);
+      });
+      thead.appendChild(trh);
+      table.appendChild(thead);
+
+      const tbody = document.createElement("tbody");
+      rows.forEach(r => {
+        const tr = document.createElement("tr");
+        r.forEach((cell, idx) => {
+          const td = document.createElement("td");
+          td.textContent = cell;
+          if (idx === 0) td.style.fontWeight = 700;
+          tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);
+
+      $$("#tableWrap").style.display = "block";
+    }
+
+    $$("#tableBtn").addEventListener("click", () => {
+      const start = Number($$("#rangeStart").value);
+      const end = Number($$("#rangeEnd").value);
+      const step = Number($$("#rangeStep").value);
+      const percents = parsePercents($$("#percents").value);
+      if ([start, end, step].some(v => Number.isNaN(v)) || start < 0 || end < 0 || step <= 0 || start > end) {
+        alert("請確認區間設定（起訖、步進）皆為有效數字，且起始 ≤ 結束。");
+        return;
+      }
+      if (!percents.length) { alert("請輸入至少一個回饋率。"); return; }
+      buildTable(start, end, step, percents);
+      toastOK($$("#tableBtn"));
+    });
+
+    // 匯出 CSV
+    $$("#csvBtn").addEventListener("click", () => {
+      if (!latestTableData) { alert("請先產生速查表。"); return; }
+      const { headers, rows } = latestTableData;
+      let csv = headers.join(",") + "\n";
+      csv += rows.map(r => r.join(",")).join("\n");
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const stamp = new Date().toISOString().slice(0,10);
+      a.href = url;
+      a.download = `cashback-table-${stamp}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      toastOK($$("#csvBtn"));
+    });
+
+    // 預設先算一次體驗
+    (function bootstrap() {
+      try {
+        $$("#cashbackVal").textContent = cashback(31, 3.3);
+        $$("#thresholdVal").textContent = thresholdForMinReward(3.8, 1);
+        buildTable(10, 200, 10, [3.8, 3.3, 2]);
+      } catch (e) { /* ignore */ }
+    })();
+  </script>
 </body>
 </html>
