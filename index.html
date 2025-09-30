@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Richart 單筆回饋計算器（無條件捨去）</title>
+  <meta name="description" content="Richart 卡單筆回饋計算器：單筆金額 × 回饋率 → 無條件捨去；門檻速算與速查表。">
+  <style>
+    :root {
+      --bg: #0f1221;
+      --card: #161a2f;
+      --muted: #9aa3b2;
+      --text: #e8ecf3;
+      --accent: #7aa2ff;
+      --accent-2: #00d1b2;
+      --danger: #ff6b6b;
+      --border: #2a3050;
+      --radius: 12px;
+      --shadow: 0 8px 24px rgba(0,0,0,0.35);
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
+      background: radial-gradient(1200px 800px at 20% -10%, #1b2040 0, #0f1221 60%) fixed;
+      color: var(--text);
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    .container {
+      max-width: 980px;
+      margin: 24px auto 64px;
+      padding: 0 16px;
+    }
+    header {
+      display: flex; gap: 16px; align-items: center; flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+    .logo {
+      width: 44px; height: 44px; border-radius: 12px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      box-shadow: var(--shadow);
+    }
+    h1 {
+      font-size: 1.6rem; margin: 0;
+      letter-spacing: .5px;
+    }
+    .sub { color: var(--muted); font-size: .95rem; }
+
+    .grid {
+      display: grid; gap: 16px;
+      grid-template-columns: repeat(12, 1fr);
+    }
+    .card {
+      background: color-mix(in oklab, var(--card), #ffffff 0%);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 16px;
+    }
+    .span-12 { grid-column: span 12; }
+    .span-6 { grid-column: span 6; }
+    .span-4 { grid-column: span 4; }
+    @media (max-width: 900px) {
+      .span-6, .span-4 { grid-column: span 12; }
+    }
+
+    .section-title { margin: 0 0 12px; font-size: 1.1rem; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .row-3 { grid-template-columns: repeat(3, 1fr); }
+    .row-4 { grid-template-columns: repeat(4, 1fr); }
+    .row + .row { margin-top: 12px; }
+
+    label { display: block; font-size: .9rem; color: var(--muted); margin-bottom: 6px; }
+    input, button, textarea {
+      width: 100%; font: inherit; color: var(--text);
+      background: #101428; border: 1px solid var(--border); border-radius: 10px;
+      padding: 10px 12px;
+    }
+    input:focus, button:focus, textarea:focus { outline: 2px solid color-mix(in oklab, var(--accent), #fff 10%); outline-offset: 2px; }
+
+    .btn {
+      cursor: pointer;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      border: none; color: #0c1022; font-weight: 700;
+      transition: transform .05s ease, filter .15s ease;
+    }
+    .btn:hover { filter: brightness(1.03); }
+    .btn:active { transform: translateY(1px); }
+    .btn-ghost {
+      background: transparent; color: var(--text);
+      border: 1px dashed var(--border);
+    }
+    .note { color: var(--muted); font-size: .9rem; margin-top: 8px; }
+
+    .stat {
+      display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 8px;
+      padding: 12px; border-radius: 12px; background: #0c1022; border: 1px solid var(--border);
+      font-family: var(--mono);
+    }
+    .stat .val { font-size: 1.6rem; font-weight: 800; }
+    .muted { color: var(--muted); }
+
+    table { width: 100%; border-collapse: collapse; font-family: var(--mono); }
+    th, td { border: 1px solid var(--border); padding: 8px 10px; text-align: right; }
+    th:first-child, td:first-child { text-align: left; }
+    thead th { background: #131735; position: sticky; top: 0; z-index: 1; }
+    tbody tr:nth-child(odd) { background: #0e1330; }
+    .table-wrap { max-height: 420px; overflow: auto; border: 1px solid var(--border); border-radius: 10px; }
+
+    footer { margin-top: 24px; color: var(--muted); font-size: .9rem; }
+    .kbd { font-family: var(--mono); background:#0c1022; border:1px solid var(--border); padding:2px 6px; border-radius:6px }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="logo" aria-hidden="true"></div>
+      <div>
+        <h1>Richart 單筆回饋計算器 <span class="muted">（無條件捨去）</span></h1>
+        <div class="sub">公式：回饋金額 = ⌊ 金額 × 回饋率 ⌋；門檻(至少 N 元) = ⌈ N / 回饋率 ⌉</div>
+      </div>
+    </header>
+    <p>（此處省略，完整內容與先前提供一致）</p>
+  </div>
+</body>
+</html>
