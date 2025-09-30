@@ -1,0 +1,370 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Richart 單筆回饋計算器（無條件捨去）</title>
+  <meta name="description" content="Richart 卡單筆回饋計算器：單筆金額 × 回饋率 → 無條件捨去；門檻速算與速查表。">
+  <style>
+    :root {
+      --bg: #0f1221;
+      --card: #161a2f;
+      --muted: #9aa3b2;
+      --text: #e8ecf3;
+      --accent: #7aa2ff;
+      --accent-2: #00d1b2;
+      --danger: #ff6b6b;
+      --border: #2a3050;
+      --radius: 12px;
+      --shadow: 0 8px 24px rgba(0,0,0,0.35);
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
+      background: radial-gradient(1200px 800px at 20% -10%, #1b2040 0, #0f1221 60%) fixed;
+      color: var(--text);
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    .container {
+      max-width: 980px;
+      margin: 24px auto 64px;
+      padding: 0 16px;
+    }
+    header {
+      display: flex; gap: 16px; align-items: center; flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+    .logo {
+      width: 44px; height: 44px; border-radius: 12px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      box-shadow: var(--shadow);
+    }
+    h1 {
+      font-size: 1.6rem; margin: 0;
+      letter-spacing: .5px;
+    }
+    .sub { color: var(--muted); font-size: .95rem; }
+
+    .grid {
+      display: grid; gap: 16px;
+      grid-template-columns: repeat(12, 1fr);
+    }
+    .card {
+      background: color-mix(in oklab, var(--card), #ffffff 0%);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 16px;
+    }
+    .span-12 { grid-column: span 12; }
+    .span-6 { grid-column: span 6; }
+    .span-4 { grid-column: span 4; }
+    @media (max-width: 900px) {
+      .span-6, .span-4 { grid-column: span 12; }
+    }
+
+    .section-title { margin: 0 0 12px; font-size: 1.1rem; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .row-3 { grid-template-columns: repeat(3, 1fr); }
+    .row-4 { grid-template-columns: repeat(4, 1fr); }
+    .row + .row { margin-top: 12px; }
+
+    label { display: block; font-size: .9rem; color: var(--muted); margin-bottom: 6px; }
+    input, button, textarea {
+      width: 100%; font: inherit; color: var(--text);
+      background: #101428; border: 1px solid var(--border); border-radius: 10px;
+      padding: 10px 12px;
+    }
+    input:focus, button:focus, textarea:focus { outline: 2px solid color-mix(in oklab, var(--accent), #fff 10%); outline-offset: 2px; }
+
+    .btn {
+      cursor: pointer;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      border: none; color: #0c1022; font-weight: 700;
+      transition: transform .05s ease, filter .15s ease;
+    }
+    .btn:hover { filter: brightness(1.03); }
+    .btn:active { transform: translateY(1px); }
+    .btn-ghost {
+      background: transparent; color: var(--text);
+      border: 1px dashed var(--border);
+    }
+    .note { color: var(--muted); font-size: .9rem; margin-top: 8px; }
+
+    .stat {
+      display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 8px;
+      padding: 12px; border-radius: 12px; background: #0c1022; border: 1px solid var(--border);
+      font-family: var(--mono);
+    }
+    .stat .val { font-size: 1.6rem; font-weight: 800; }
+    .muted { color: var(--muted); }
+
+    table { width: 100%; border-collapse: collapse; font-family: var(--mono); }
+    th, td { border: 1px solid var(--border); padding: 8px 10px; text-align: right; }
+    th:first-child, td:first-child { text-align: left; }
+    thead th { background: #131735; position: sticky; top: 0; z-index: 1; }
+    tbody tr:nth-child(odd) { background: #0e1330; }
+    .table-wrap { max-height: 420px; overflow: auto; border: 1px solid var(--border); border-radius: 10px; }
+
+    footer { margin-top: 24px; color: var(--muted); font-size: .9rem; }
+    .kbd { font-family: var(--mono); background:#0c1022; border:1px solid var(--border); padding:2px 6px; border-radius:6px }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="logo" aria-hidden="true"></div>
+      <div>
+        <h1>Richart 單筆回饋計算器 <span class="muted">（無條件捨去）</span></h1>
+        <div class="sub">公式：回饋金額 = ⌊ 金額 × 回饋率 ⌋；門檻(至少 N 元) = ⌈ N / 回饋率 ⌉</div>
+      </div>
+    </header>
+
+    <div class="grid">
+      <!-- 單筆計算 -->
+      <section class="card span-6">
+        <h2 class="section-title">單筆回饋</h2>
+        <div class="row">
+          <div>
+            <label for="amount">單筆金額（元）</label>
+            <input id="amount" type="number" inputmode="numeric" min="0" step="1" value="31" />
+          </div>
+          <div>
+            <label for="percent">回饋率（%）</label>
+            <input id="percent" type="number" inputmode="decimal" min="0" step="0.1" value="3.3" />
+          </div>
+        </div>
+        <div class="row" style="margin-top:12px">
+          <button id="calcBtn" class="btn">計算</button>
+          <button id="reset1" class="btn-ghost">重置</button>
+        </div>
+        <div class="stat" style="margin-top:12px">
+          <div>
+            <div class="muted">回饋金額（元）</div>
+            <div id="cashbackVal" class="val">—</div>
+          </div>
+          <div class="muted">採「單筆 × 回饋率 → 無條件捨去」</div>
+        </div>
+      </section>
+
+      <!-- 門檻計算 -->
+      <section class="card span-6">
+        <h2 class="section-title">最低門檻（至少 N 元回饋）</h2>
+        <div class="row">
+          <div>
+            <label for="percent2">回饋率（%）</label>
+            <input id="percent2" type="number" inputmode="decimal" min="0.0001" step="0.1" value="3.8" />
+          </div>
+          <div>
+            <label for="minReward">至少回饋（元）</label>
+            <input id="minReward" type="number" inputmode="numeric" min="1" step="1" value="1" />
+          </div>
+        </div>
+        <div class="row" style="margin-top:12px">
+          <button id="thresholdBtn" class="btn">計算門檻</button>
+          <button id="reset2" class="btn-ghost">重置</button>
+        </div>
+        <div class="stat" style="margin-top:12px">
+          <div>
+            <div class="muted">最低需刷（元）</div>
+            <div id="thresholdVal" class="val">—</div>
+          </div>
+          <div class="muted">門檻 = ⌈ N / (回饋率/100) ⌉</div>
+        </div>
+        <p class="note">
+          範例：3.8% 要拿 1 元 → ⌈1 / 0.038⌉ = 27；3.3% → 31；2% → 50。
+        </p>
+      </section>
+
+      <!-- 速查表 -->
+      <section class="card span-12">
+        <h2 class="section-title">速查表（區間產生）</h2>
+        <div class="row row-4">
+          <div>
+            <label for="rangeStart">起始（元，含）</label>
+            <input id="rangeStart" type="number" inputmode="numeric" min="0" step="1" value="10" />
+          </div>
+          <div>
+            <label for="rangeEnd">結束（元，含）</label>
+            <input id="rangeEnd" type="number" inputmode="numeric" min="0" step="1" value="200" />
+          </div>
+          <div>
+            <label for="rangeStep">步進（元）</label>
+            <input id="rangeStep" type="number" inputmode="numeric" min="1" step="1" value="10" />
+          </div>
+          <div>
+            <label for="percents">回饋率列表（以空白分隔，例如：<span class="kbd">3.8 3.3 2</span>）</label>
+            <input id="percents" type="text" value="3.8 3.3 2" />
+          </div>
+        </div>
+        <div class="row" style="margin-top:12px">
+          <button id="tableBtn" class="btn">產生速查表</button>
+          <button id="csvBtn" class="btn-ghost">匯出 CSV</button>
+        </div>
+        <div id="tableWrap" class="table-wrap" style="margin-top:12px; display:none;">
+          <table id="resultTable" aria-live="polite"></table>
+        </div>
+        <p class="note">提示：可把常用的回饋率填成 <span class="kbd">3.8 3.3 2</span>、或任何你有的活動檔期。</p>
+      </section>
+    </div>
+
+    <footer>
+      <p>計算規則：<strong>單筆</strong>金額 × 回饋率 → <strong>無條件捨去</strong>到整數元；門檻採用數學上的天花板函數（<code>ceil</code>）。</p>
+      <p>Made for GitHub Pages · 無外部依賴，可離線使用（瀏覽器快取）。</p>
+    </footer>
+  </div>
+
+  <script>
+    // --- Core math ---
+    const floor = Math.floor;
+    const ceil = Math.ceil;
+
+    function cashback(amount, percent) {
+      if (amount < 0 || percent < 0) throw new Error("amount/percent must be non-negative");
+      return floor(amount * (percent / 100));
+    }
+    function thresholdForMinReward(percent, minReward = 1) {
+      if (percent <= 0 || minReward <= 0) throw new Error("percent/minReward must be positive");
+      const rate = percent / 100;
+      return ceil(minReward / rate);
+    }
+
+    // Utility
+    const $$ = (sel) => document.querySelector(sel);
+    function parsePercents(str) {
+      return str
+        .split(/[\s,]+/)
+        .map(s => s.trim())
+        .filter(Boolean)
+        .map(Number)
+        .filter(v => !Number.isNaN(v) && v >= 0);
+    }
+    function toastOK(btn) {
+      const t = btn.textContent;
+      btn.textContent = "✓ 完成";
+      btn.disabled = true;
+      setTimeout(() => { btn.textContent = t; btn.disabled = false; }, 900);
+    }
+
+    // 單筆
+    $$("#calcBtn").addEventListener("click", () => {
+      const amt = Number($$("#amount").value);
+      const p = Number($$("#percent").value);
+      if (Number.isNaN(amt) || Number.isNaN(p) || amt < 0 || p < 0) {
+        alert("請輸入有效的金額與回饋率。");
+        return;
+      }
+      $$("#cashbackVal").textContent = cashback(amt, p);
+      toastOK($$("#calcBtn"));
+    });
+    $$("#reset1").addEventListener("click", () => {
+      $$("#amount").value = 31;
+      $$("#percent").value = 3.3;
+      $$("#cashbackVal").textContent = "—";
+    });
+
+    // 門檻
+    $$("#thresholdBtn").addEventListener("click", () => {
+      const p = Number($$("#percent2").value);
+      const n = Number($$("#minReward").value);
+      if (Number.isNaN(p) || Number.isNaN(n) || p <= 0 || n <= 0) {
+        alert("請輸入有效的回饋率與至少回饋金額（> 0）。");
+        return;
+      }
+      $$("#thresholdVal").textContent = thresholdForMinReward(p, n);
+      toastOK($$("#thresholdBtn"));
+    });
+    $$("#reset2").addEventListener("click", () => {
+      $$("#percent2").value = 3.8;
+      $$("#minReward").value = 1;
+      $$("#thresholdVal").textContent = "—";
+    });
+
+    // 速查表
+    let latestTableData = null;
+
+    function buildTable(start, end, step, percents) {
+      const headers = ["金額(元)", ...percents.map(p => `${+p}%`)];
+      const rows = [];
+      for (let amt = start; amt <= end; amt += step) {
+        rows.push([amt, ...percents.map(p => cashback(amt, p))]);
+      }
+      latestTableData = { headers, rows }; // for CSV export
+
+      const table = $$("#resultTable");
+      table.innerHTML = "";
+      const thead = document.createElement("thead");
+      const trh = document.createElement("tr");
+      headers.forEach(h => {
+        const th = document.createElement("th");
+        th.textContent = h;
+        trh.appendChild(th);
+      });
+      thead.appendChild(trh);
+      table.appendChild(thead);
+
+      const tbody = document.createElement("tbody");
+      rows.forEach(r => {
+        const tr = document.createElement("tr");
+        r.forEach((cell, idx) => {
+          const td = document.createElement("td");
+          td.textContent = cell;
+          if (idx === 0) td.style.fontWeight = 700;
+          tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);
+
+      $$("#tableWrap").style.display = "block";
+    }
+
+    $$("#tableBtn").addEventListener("click", () => {
+      const start = Number($$("#rangeStart").value);
+      const end = Number($$("#rangeEnd").value);
+      const step = Number($$("#rangeStep").value);
+      const percents = parsePercents($$("#percents").value);
+      if ([start, end, step].some(v => Number.isNaN(v)) || start < 0 || end < 0 || step <= 0 || start > end) {
+        alert("請確認區間設定（起訖、步進）皆為有效數字，且起始 ≤ 結束。");
+        return;
+      }
+      if (!percents.length) { alert("請輸入至少一個回饋率。"); return; }
+      buildTable(start, end, step, percents);
+      toastOK($$("#tableBtn"));
+    });
+
+    // 匯出 CSV
+    $$("#csvBtn").addEventListener("click", () => {
+      if (!latestTableData) { alert("請先產生速查表。"); return; }
+      const { headers, rows } = latestTableData;
+      let csv = headers.join(",") + "\n";
+      csv += rows.map(r => r.join(",")).join("\n");
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const stamp = new Date().toISOString().slice(0,10);
+      a.href = url;
+      a.download = `cashback-table-${stamp}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      toastOK($$("#csvBtn"));
+    });
+
+    // 預設先算一次體驗
+    (function bootstrap() {
+      try {
+        $$("#cashbackVal").textContent = cashback(31, 3.3);
+        $$("#thresholdVal").textContent = thresholdForMinReward(3.8, 1);
+        buildTable(10, 200, 10, [3.8, 3.3, 2]);
+      } catch (e) { /* ignore */ }
+    })();
+  </script>
+</body>
+</html>
